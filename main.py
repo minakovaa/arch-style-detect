@@ -1,5 +1,5 @@
 import os
-from img_preprocessing import rename_files_in_folder, convert_img
+from convert_img import rename_files_in_folder, convert_img
 
 
 def convert_all_images_to_jpeg(dataset_path):
@@ -19,6 +19,6 @@ def convert_all_images_to_jpeg(dataset_path):
 
 
 if __name__ == '__main__':
-    dataset_path = 'Датасет/'
+    dataset_path = 'dataset'
 
     convert_all_images_to_jpeg(dataset_path)
