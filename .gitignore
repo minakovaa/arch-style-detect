@@ -1,5 +1,11 @@
 .DS_Store
 .idea/
 dataset/
-data/
+dataset/*
 venv/
+classifier/*
+!classifier/classifier_prediction.py
+dataset_from_bot/
+bot/key_bot.md
+test_one_img.py
+bot/__pycache__/
