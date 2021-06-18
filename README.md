@@ -31,3 +31,7 @@ optional arguments:
                         Maximum size of each image in bytes.
 
 ```
+
+## Delete image duplicates
+
+To delete image duplicate you can use script **find_similar_imgs.py** with parameters.
