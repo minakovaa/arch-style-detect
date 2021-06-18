@@ -3,21 +3,20 @@ import torch.nn as nn
 
 from torchvision import models, transforms
 import numpy as np
+from collections import Counter
 from scipy.special import softmax
 
 
 def load_checkpoint(checkpoint_path=None, device=None):
     if checkpoint_path is None:
-        checkpoint_path = "classifier/checkpoints/model_arch_test_9375.pt"
+        checkpoint_path = "classifier/checkpoints/model_arch_test_new_9305.pt"
 
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
-    # num_classes = checkpoint['num_classes']
-    num_classes = 4
-    # class_names = checkpoint['class_names']
-    class_names = ['барокко', 'классицизм', 'русское_барокко', 'узорочье']
+    class_names = checkpoint['class_names']
+    num_classes = len(class_names)
 
     model_loaded = models.resnet18(pretrained=False)  # models.resnet152(pretrained=False)
     num_ftrs = model_loaded.fc.in_features
@@ -38,7 +37,6 @@ def classifier_predict(model, input_img, device=None):
 
     transform_evaluate = transforms.Compose([
         transforms.Resize(400), transforms.CenterCrop(224),
-        # transforms.Resize(224),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
@@ -52,9 +50,48 @@ def classifier_predict(model, input_img, device=None):
     return preds, outputs.squeeze().detach().numpy()
 
 
-def arch_style_predict_by_image(img):
-    model_loaded, class_names = load_checkpoint()
-    preds, outputs = classifier_predict(model=model_loaded, input_img=img)
+def classifier_predict_voting(model, input_img, num_samples=5, device=None):
+    """
+    num_samples:  How many transformation with one image and voting prediction classes
+    """
+
+    if device is None:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    model.eval()
+
+    transform_for_voting = transforms.Compose([
+        transforms.RandomResizedCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+
+    imgs = []
+    for i in range(num_samples):
+        imgs.append(transform_for_voting(input_img))
+
+    batch_imgs = torch.stack(imgs)
+
+    inputs = batch_imgs.to(device)
+    outputs = model(inputs)
+    _, preds = torch.max(outputs, 1)  # top_1 predicted class
+
+    if device == torch.device("cpu"):
+        preds, outputs = preds.detach().numpy(), outputs.detach().numpy()
+    else:
+        preds, outputs = preds.cpu().detach().numpy(), outputs.cpu().detach().numpy()
+
+    # By voting predict class
+    vote_preds = Counter(preds)
+    win_class = max(vote_preds, key=vote_preds.get)
+
+    wieght_outputs = outputs.sum(axis=0) / num_samples
+
+    return win_class, wieght_outputs
+
+
+def arch_style_predict_by_image(img, model, class_names):
+    preds, outputs = classifier_predict(model=model, input_img=img)
 
     probabilities = softmax(outputs)  # From output CrossEntropy obtain probabilities
 
