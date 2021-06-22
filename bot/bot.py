@@ -4,7 +4,6 @@ from aiogram import Bot, Dispatcher, executor, types
 import aiohttp
 from PIL import Image
 from io import BytesIO
-import random
 import os
 import shutil
 
@@ -27,7 +26,8 @@ styles_description = {
     'классицизм': "https://ru.wikipedia.org/wiki/%D0%9A%D0%BB%D0%B0%D1%81%D1%81%D0%B8%D1%86%D0%B8%D0%B7%D0%BC#%D0%90%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0",
     'русское_барокко': "https://ru.wikipedia.org/wiki/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%BE%D0%B5_%D0%B1%D0%B0%D1%80%D0%BE%D0%BA%D0%BA%D0%BE",
     'узорочье': "https://ru.wikipedia.org/wiki/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%BE%D0%B5_%D1%83%D0%B7%D0%BE%D1%80%D0%BE%D1%87%D1%8C%D0%B5",
-    'готика': "https://ru.wikipedia.org/wiki/%D0%93%D0%BE%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0"}
+    'готика': "https://ru.wikipedia.org/wiki/%D0%93%D0%BE%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0",
+    'неоклассицизм_сталинского_периода': "https://ru.wikipedia.org/wiki/%D0%A1%D1%82%D0%B0%D0%BB%D0%B8%D0%BD%D1%81%D0%BA%D0%B0%D1%8F_%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0"}
 
 choose_styles_keyboard = types.InlineKeyboardMarkup(resize_keyboard=True,
                                                     one_time_keyboard=True,
@@ -45,17 +45,17 @@ async def send_welcome(message: types.Message):
                         "\nЭтот бот умеет определять архитектурный стиль здания. "
                         "Достаточно отправить фотографию."
 
-                        "\n\nБот различает следующие архитектурные стили:\n" +
-                        ', '.join([s.replace('_', ' ').capitalize() for s in styles]) + "."
+                        f"\n\nБот различает {len(styles)} следующих архитектурных стилей:\n" +
+                        ",\n".join([s.replace('_', ' ').capitalize() for s in styles]) + "."
 
-                                                                                        "\n\n/styles - подробнее узнать об архитектурных стилях"
+                        "\n\n/styles - подробнее узнать об архитектурных стилях"
 
-                                                                                        "\n\nПоддержать автора 🤗"
-                                                                                        "\nhttps://archwalk.ru/donate"
+                        "\n\nПоддержать автора 🤗"
+                        "\nhttps://archwalk.ru/donate"
 
-                                                                                        "\n\nПриходите экскурсии и лекции об архитектуре Москвы "
-                                                                                        "c Галиной Минаковой"
-                                                                                        "\nhttps://archwalk.ru"
+                        "\n\nПриходите экскурсии и лекции об архитектуре Москвы "
+                        "c Галиной Минаковой"
+                        "\nhttps://archwalk.ru"
                         # "\n\nПро создание бота можно прочитать на сайте "
                         # "Галины Минаковой https://archwalk.ru/about_bot"
                         ,
@@ -115,9 +115,12 @@ async def detect_style(file_image: types.file):
     img = await download_image(file_image)
 
     # Predict arch styles
-    top_1_style, top_3_styles_with_probabilities = arch_style_predict_by_image(img,
-                                                                               model=model_loaded,
-                                                                               class_names=styles)
+    top_3_styles_with_proba = arch_style_predict_by_image(img,
+                                                          model=model_loaded,
+                                                          class_names=styles,
+                                                          samples_for_voting=10)
+
+    top_1_style = max(top_3_styles_with_proba, key=lambda x: top_3_styles_with_proba[x])
 
     # Save image after classify to class folder on server
     save_image(img,
@@ -129,9 +132,8 @@ async def detect_style(file_image: types.file):
     top_1_style = top_1_style.replace('_', ' ').capitalize()
 
     result_str = "\n\nРаспределение вероятностей по топ-3 стилям:\n"
-    for style, proba in top_3_styles_with_probabilities.items():
+    for style, proba in top_3_styles_with_proba.items():
         result_str += f"{style.replace('_', ' ').capitalize()}: {proba:.03f}\n"
-        # TODO probabilities must be 1 in sum. Thus you should 1 - {proba:.03f}
 
     await file_image.reply(f"Архитектурный стиль: {top_1_style}"
                            f"{result_str}"
@@ -139,6 +141,7 @@ async def detect_style(file_image: types.file):
 
                            "\n\nПоддержать автора 🤗"
                            "\nhttps://archwalk.ru/donate",
+                           disable_web_page_preview=True,
                            reply=True)
 
 

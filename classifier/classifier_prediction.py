@@ -2,14 +2,13 @@ import torch
 import torch.nn as nn
 
 from torchvision import models, transforms
-import numpy as np
 from collections import Counter
 from scipy.special import softmax
 
 
 def load_checkpoint(checkpoint_path=None, device=None):
     if checkpoint_path is None:
-        checkpoint_path = "classifier/checkpoints/model_arch_test_new_9305.pt"
+        checkpoint_path = "classifier/checkpoints/model_arch_test_new_50_epoch.pt"
 
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -54,7 +53,6 @@ def classifier_predict_voting(model, input_img, num_samples=5, device=None):
     """
     num_samples:  How many transformation with one image and voting prediction classes
     """
-
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -90,16 +88,22 @@ def classifier_predict_voting(model, input_img, num_samples=5, device=None):
     return win_class, wieght_outputs
 
 
-def arch_style_predict_by_image(img, model, class_names):
-    preds, outputs = classifier_predict(model=model, input_img=img)
+def arch_style_predict_by_image(img, model, class_names, samples_for_voting=None):
+    preds = None
+    outputs = None
+
+    if samples_for_voting is None:
+        preds, outputs = classifier_predict(model=model, input_img=img)
+    else:
+        preds, outputs = classifier_predict_voting(model=model, input_img=img, num_samples=samples_for_voting)
 
     probabilities = softmax(outputs)  # From output CrossEntropy obtain probabilities
 
     sorted_ind_by_proba = probabilities.argsort()
     top_3_ind = sorted_ind_by_proba[-3:][::-1]
-    other_ind = sorted_ind_by_proba[:-3][::-1]  # Indexes of remaining probabilities
+    # other_ind = sorted_ind_by_proba[:-3][::-1]  # Indexes of remaining probabilities
 
-    top_3_styles_probability = {class_names[i]: probabilities[i] for i in top_3_ind}
-    top_3_styles_probability.update({'Остальные': np.sum(probabilities[other_ind])})
+    top_3_styles_probability = {class_names[i]: round(probabilities[i], 3) for i in top_3_ind}
+    top_3_styles_probability.update({'Остальные': round(1.0 - sum(top_3_styles_probability.values()), 3)})
 
-    return class_names[preds], top_3_styles_probability
+    return top_3_styles_probability
