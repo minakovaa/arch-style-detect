@@ -8,9 +8,11 @@ dataset*
 
 classifier/*
 !classifier/classifier_prediction.py
+!classifier/__init__.py
 
 bot/*
 !bot/bot.py
+!bot/__init__.py
 
 preprocess_img/__pycache__/
 
