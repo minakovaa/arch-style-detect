@@ -1,13 +1,20 @@
 import logging
+import logging.config
 import sys
-from aiogram import Bot, Dispatcher, executor, types, utils
-import aiohttp
-from PIL import Image
 from io import BytesIO
 import os
 import shutil
 
+import yaml
+from aiogram import Bot, Dispatcher, executor, types, utils
+import aiohttp
+from PIL import Image
+
 from classifier.classifier_prediction import arch_style_predict_by_image, load_checkpoint
+
+LOGGER_FILE_CONFIG = "bot_logging.conf.yml"
+
+logger = logging.getLogger("bot")
 
 API_TOKEN = sys.argv[1]  # 'BOT TOKEN HERE'
 
@@ -18,7 +25,7 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-model_loaded, styles = load_checkpoint(model_name='efficientnet-b5')
+model_loaded, styles = load_checkpoint(model_name='resnet18') #efficientnet-b5
 
 styles_description = {
     'барокко': "https://ru.wikipedia.org/wiki/%D0%90%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0_%D0%B1%D0%B0%D1%80%D0%BE%D0%BA%D0%BA%D0%BE",
@@ -38,8 +45,18 @@ for style in styles:
     choose_styles_keyboard.add(button_style)
 
 
+def setup_logging(logging_yaml_config_fpath):
+    """setup logging via YAML if it is provided"""
+    if logging_yaml_config_fpath:
+        with open(logging_yaml_config_fpath) as config_fin:
+            logging.config.dictConfig(yaml.safe_load(config_fin))
+
+
 @dp.message_handler(commands=['start', 'help'])
 async def send_welcome(message: types.Message):
+    """
+    This handler will be called when user sends `/start` or `/help` command
+    """
     await message.reply("Привет!"
                         "\nЭтот бот умеет определять архитектурный стиль здания.\n" +
                         utils.markdown.bold("Достаточно отправить фотографию") + "."
@@ -60,9 +77,6 @@ async def send_welcome(message: types.Message):
                         parse_mode=types.ParseMode.MARKDOWN,
                         disable_web_page_preview=True,
                         reply=False)
-    """
-    This handler will be called when user sends `/start` or `/help` command
-    """
 
 
 async def download_image(file_image: types.file):
@@ -107,6 +121,8 @@ def save_image(img, folder_name, img_name):
 
     img.save(os.path.join(path_folder, img_name), 'JPEG')
 
+    logger.debug("Save image %s", img_name)
+
 
 @dp.message_handler(content_types=['photo'])
 async def detect_style(file_image: types.file):
@@ -117,6 +133,7 @@ async def detect_style(file_image: types.file):
     top_3_styles_with_proba = arch_style_predict_by_image(img,
                                                           model=model_loaded,
                                                           class_names=styles,
+                                                          logger=logger,
                                                           samples_for_voting=6,
                                                           batch_size_voting=1,
                                                           is_debug=True)
@@ -175,4 +192,6 @@ async def get_style_description(callback_query: types.CallbackQuery):
 
 
 if __name__ == '__main__':
+    setup_logging(LOGGER_FILE_CONFIG)
+
     executor.start_polling(dp, skip_updates=True)

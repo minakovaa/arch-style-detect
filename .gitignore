@@ -9,3 +9,5 @@ dataset_from_bot/
 bot/key_bot.md
 test_one_img.py
 bot/__pycache__/
+*.debug
+*.warn

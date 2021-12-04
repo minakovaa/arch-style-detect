@@ -1,0 +1,28 @@
+version: 1
+formatters:
+  simple:
+    format: "%(asctime)s %(name)s %(levelname)s %(message)s"
+handlers:
+  file_debug_handler:
+    class: logging.FileHandler
+    filename: arch_bot_log.debug
+    level: DEBUG
+    formatter: simple
+  file_warning_handler:
+    class: logging.FileHandler
+    filename: arch_bot_log.warn
+    level: WARNING
+    formatter: simple
+  stream_handler:
+    class: logging.StreamHandler
+    stream : ext://sys.stdout
+    level: INFO
+    formatter: simple
+loggers:
+  bot:
+    level: DEBUG
+    handlers: [file_debug_handler, file_warning_handler, stream_handler]
+    propagate: no
+root:
+  level: DEBUG
+  handlers: [file_debug_handler, file_warning_handler, stream_handler]
