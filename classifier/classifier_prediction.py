@@ -2,84 +2,183 @@ import torch
 import torch.nn as nn
 
 from torchvision import models, transforms
+
+from efficientnet_pytorch import EfficientNet
+
 from collections import Counter
 from scipy.special import softmax
+import numpy as np
+
+import gc
+
+import os
+import psutil
+
+# clf_img_size: Final image size that apply in transform
+clf_image_size = 224
+advprop = False  # For models using advprop pretrained weights different normalization
 
 
-def load_checkpoint(checkpoint_path=None, device=None):
-    if checkpoint_path is None:
-        checkpoint_path = "classifier/checkpoints/model_arch_test_new_50_epoch.pt"
+def check_memory(info_str):
+    p = psutil.Process(os.getpid())
+    mem_usage = p.memory_info().rss / 1024 / 1024
+    print(f"{info_str}: {mem_usage} MB")
 
+
+def load_checkpoint(checkpoint_path=None, device=None, model_name='efficientnet-b5'):
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    global clf_image_size
+    global advprop
+
+    if checkpoint_path is None:
+        if model_name == 'resnet18':
+            checkpoint_path = "classifier/checkpoints/model_arch_test_new_50_epoch.pt"  # test acc voited = 0.9217
+            clf_image_size = 224
+
+        elif model_name == 'resnet152':
+            checkpoint_path = "classifier/checkpoints/model_resnet152_gray_0_5_num_1.pt"
+            clf_image_size = 224
+
+        elif model_name == 'efficientnet-b5':
+            advprop = True
+
+            checkpoint_path = 'classifier/checkpoints/model_advprop_efficientnet-b5_num_1.pt'
+            clf_image_size = EfficientNet.get_image_size(model_name)
+
+        elif model_name == 'efficientnet-b6':
+            checkpoint_path = 'classifier/checkpoints/model_efficientnet-b6_num_1.pt'
+            clf_image_size = EfficientNet.get_image_size(model_name)
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
     class_names = checkpoint['class_names']
     num_classes = len(class_names)
 
-    model_loaded = models.resnet18(pretrained=False)  # models.resnet152(pretrained=False)
-    num_ftrs = model_loaded.fc.in_features
-    model_loaded.fc = nn.Linear(num_ftrs, num_classes)
+    model_loaded = None
+
+    if model_name == 'resnet18':
+        model_loaded = models.resnet18(pretrained=False)  # resnet18  # resnet152 # wide_resnet101_2
+        num_ftrs = model_loaded.fc.in_features
+        model_loaded.fc = nn.Linear(num_ftrs, num_classes)
+
+    elif model_name == 'resnet152':
+        model_loaded = models.resnet152(pretrained=False)  # resnet18  # resnet152 # wide_resnet101_2
+        num_ftrs = model_loaded.fc.in_features
+        model_loaded.fc = nn.Linear(num_ftrs, num_classes)
+
+    elif model_name == 'efficientnet-b5':
+        model_loaded = EfficientNet.from_pretrained('efficientnet-b5', num_classes=num_classes)
+
+    elif model_name == 'efficientnet-b6':
+        model_loaded = EfficientNet.from_pretrained('efficientnet-b6', num_classes=num_classes)
 
     model_loaded = model_loaded.to(device)
 
     model_loaded.load_state_dict(checkpoint['model_state_dict'])
 
+    del checkpoint
+    gc.collect()
+
     return model_loaded, class_names
 
 
-def classifier_predict(model, input_img, device=None):
+def classifier_predict(model, input_img, device=None, is_debug=False):
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    if is_debug:
+        check_memory('classifier_predict_1')
+
     model.eval()
 
+    if is_debug:
+        check_memory('classifier_predict_2')
+
+    if advprop:  # for models using advprop pretrained weights
+        normalize = transforms.Lambda(lambda img: img * 2.0 - 1.0)
+    else:
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+
     transform_evaluate = transforms.Compose([
-        transforms.Resize(400), transforms.CenterCrop(224),
+        transforms.RandomResizedCrop(clf_image_size, scale=(1., 1.), ratio=(1., 1.)),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        normalize  # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
     tensor_img = transform_evaluate(input_img)
+
     inputs = tensor_img.to(device)
+
     inputs = torch.unsqueeze(inputs, 0)  # one image as batch
+
     outputs = model(inputs)
+
     _, preds = torch.max(outputs, 1) # top_1 predicted class
+
+    if is_debug:
+        check_memory('classifier_predict_3')
 
     return preds, outputs.squeeze().detach().numpy()
 
 
-def classifier_predict_voting(model, input_img, num_samples=5, device=None):
+def classifier_predict_voting(model, input_img, num_samples=18, batch_size=6, device=None,
+                              is_debug=False):
     """
     num_samples:  How many transformation with one image and voting prediction classes
     """
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    if is_debug:
+        check_memory('classifier_predict_voting_1')
+
     model.eval()
 
+    if advprop:  # for models using advprop pretrained weights
+        normalize = transforms.Lambda(lambda img: img * 2.0 - 1.0)
+    else:
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+
     transform_for_voting = transforms.Compose([
-        transforms.RandomResizedCrop(224),
+        transforms.RandomResizedCrop(clf_image_size),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        normalize  # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-    imgs = []
-    for i in range(num_samples):
-        imgs.append(transform_for_voting(input_img))
+    preds = np.array([])
+    outputs = None
+    for i_batch in range(num_samples // batch_size):
+        # Via batches 'num_samples' of original images transformed by 'transform_for_voting'
+        batch_imgs = torch.stack([transform_for_voting(input_img) for _ in range(batch_size)])
 
-    batch_imgs = torch.stack(imgs)
+        inputs = batch_imgs.to(device)
 
-    inputs = batch_imgs.to(device)
-    outputs = model(inputs)
-    _, preds = torch.max(outputs, 1)  # top_1 predicted class
+        outputs_batch = model(inputs)
 
-    if device == torch.device("cpu"):
-        preds, outputs = preds.detach().numpy(), outputs.detach().numpy()
-    else:
-        preds, outputs = preds.cpu().detach().numpy(), outputs.cpu().detach().numpy()
+        if is_debug:
+            check_memory(f'classifier_predict_voting_batch_{i_batch}')
 
-    # By voting predict class
+        _, preds_batch = torch.max(outputs_batch, 1)  # top_1 predicted class
+
+        if device == torch.device("cpu"):
+            preds_batch, outputs_batch = preds_batch.detach().numpy(), outputs_batch.detach().numpy()
+        else:
+            preds_batch, outputs_batch = preds_batch.cpu().detach().numpy(), outputs_batch.cpu().detach().numpy()
+
+        preds = np.append(preds, preds_batch)
+
+        if outputs is None:
+            outputs = outputs_batch
+        else:
+            outputs = np.vstack((outputs, outputs_batch))
+
+    if is_debug:
+        check_memory(f'classifier_predict_voting_2')
+
+    # Voting by counting top class
     vote_preds = Counter(preds)
     win_class = max(vote_preds, key=vote_preds.get)
 
@@ -88,14 +187,19 @@ def classifier_predict_voting(model, input_img, num_samples=5, device=None):
     return win_class, wieght_outputs
 
 
-def arch_style_predict_by_image(img, model, class_names, samples_for_voting=None):
+def arch_style_predict_by_image(img, model, class_names,
+                                samples_for_voting=None, batch_size_voting=None,
+                                is_debug=False):
     preds = None
     outputs = None
 
     if samples_for_voting is None:
-        preds, outputs = classifier_predict(model=model, input_img=img)
+        preds, outputs = classifier_predict(model=model, input_img=img, is_debug=is_debug)
     else:
-        preds, outputs = classifier_predict_voting(model=model, input_img=img, num_samples=samples_for_voting)
+        preds, outputs = classifier_predict_voting(model=model, input_img=img,
+                                                   num_samples=samples_for_voting,
+                                                   batch_size=batch_size_voting,
+                                                   is_debug=is_debug)
 
     probabilities = softmax(outputs)  # From output CrossEntropy obtain probabilities
 
