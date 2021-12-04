@@ -15,8 +15,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # crop-resistant: Crop - resistant hash
 
 
-def find_similar_images(folder_path: str,
-                        delete_duplicates=False):
+def find_similar_images(folder_path: str, delete_duplicates=False, is_show_duplicates=False):
     if not os.path.isdir(folder_path):
         return None
 
@@ -24,7 +23,7 @@ def find_similar_images(folder_path: str,
 
     def is_image(filename):
         f = filename.lower()
-        return f.endswith(".png") or f.endswith(".jpg") or \
+        return f.endswith(".png") or f.endswith(".webp") or f.endswith(".jpg") or \
                f.endswith(".jpeg") or f.endswith(".bmp") or \
                f.endswith(".gif") or '.jpg' in f or f.endswith(".svg")
 
@@ -39,7 +38,9 @@ def find_similar_images(folder_path: str,
             print('Problem:', e, 'with', img)
             continue
         if hash in images_by_hash:
-            # print(img, '  already exists as', ' '.join(images_by_hash[hash]))
+            if is_show_duplicates:
+                print(img, '  already exists as', ' '.join(images_by_hash[hash]))
+
             # 'img' already exists as images_by_hash[hash]
             if delete_duplicates:
                 os.remove(img)
@@ -67,7 +68,7 @@ def delete_duplicates_in_subfolders(main_folder, delete_duplicates=False):
 
 
 if __name__ == '__main__':
-    main_folder = os.path.join(os.getcwd(), '../dataset')
+    main_folder = os.path.join(os.getcwd(), '../dataset/data')
 
     duplicates = delete_duplicates_in_subfolders(main_folder, delete_duplicates=True)
 

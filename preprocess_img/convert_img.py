@@ -2,8 +2,8 @@ import io
 import math
 import sys
 import os
+
 from PIL import Image
-import argparse
 
 
 def save_img_with_target_size(img: Image, filename: str, format: str = 'webp', target_size: int = None) -> bool:
@@ -86,6 +86,9 @@ def rename_files_in_folder(folder_path: str, common_name: str):
     sub = 0
     add = 0
 
+    if os.path.exists(os.path.join(folder_path, '.DS_Store')):
+        os.remove(os.path.join(folder_path, '.DS_Store'))
+
     for num, file_name in enumerate(os.listdir(folder_path), 1):
         name, ext = os.path.splitext(file_name)
 
@@ -102,42 +105,3 @@ def rename_files_in_folder(folder_path: str, common_name: str):
             dst_name = os.path.join(folder_path, ''.join((common_name, '_', str(num-sub+add), ext)))
 
         os.rename(src=src_name, dst=dst_name)
-
-
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser(description='Convert images with optional size compressing.')
-    parser.add_argument('--images_dir', metavar='DIR', required=True,
-                        help='Path to folder with images (may contain subfolders)')
-
-    parser.add_argument('--target_ext',  metavar='EXT', type=str, required=True,
-                        help='Target extension to convert.')
-
-    parser.add_argument('--is_delete_original', metavar='False', type=bool, default=False,
-                        help='Delete original images after converting and compressing?')
-
-    sp = parser.add_mutually_exclusive_group()
-    sp_ratio = sp.add_argument('--ratio_to_compress', metavar='RATIO', type=float, default=None, required=False,
-                                        help='Ratio to compress size of image. Float number should be between 0. and 1.')
-    sp_max_size = sp.add_argument('--max_img_size', metavar='NUM_BYTES', type=int, default=None, required=False,
-                                  help='Maximum size of each image in bytes.')
-
-    args = parser.parse_args()
-    images_dir = args.images_dir
-    target_ext = args.target_ext
-    is_delete_original = args.is_delete_original
-    ratio_to_compress = args.ratio_to_compress
-    max_img_size = args.max_img_size
-
-    for subdir, dirs, files in os.walk(images_dir):
-        for file in files:
-            file_path = os.path.join(subdir, file)
-
-            target_size = None
-            if ratio_to_compress is not None:
-                target_size = int(os.stat(file_path).st_size * ratio_to_compress)
-            elif max_img_size is not None and max_img_size < os.stat(file_path).st_size:
-                target_size = max_img_size
-
-            convert_img(file_path, is_delete_src_img=is_delete_original,
-                        to_ext=target_ext, target_size=target_size)

@@ -1,37 +1,32 @@
-## Convert images to another format
+# Arch style detection project
 
-To convert images you can use script **convert_img.py** with parameters.
+You can try it in telegram bot (temporary is unavailable).
 
+Computer vision model based on neural networks for detection
+several architectural styles. 
 
-For example, to convert all images in folder `/Users/user/dataset/` convert to **jpeg** and the result size of images
-equal to 80 percents of original image size. Delete source images if can save it in target format.
+Current architecture styles classification is relevant for Russia. 
+In European or American architecture classification consist many styles
+not present in Russia and vice versa.
 
-`python convert_img.py --images_dir datadir/ --target_ext jpeg --is_delete_original True --ratio_to_compress 0.8`
-
-And run `python convert_img.py -h` to show help:
-
-```
-usage: convert_img.py [-h] --images_dir DIR --target_ext EXT
-                            [--is_delete_original False]
-                            [--ratio_to_compress RATIO | --max_img_size NUM_BYTES]
-
-Convert images with optional size compressing.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --images_dir DIR      Path to folder with images (may contain subfolders)
-  --target_ext EXT      Target extension to convert.
-  --is_delete_original False
-                        Delete original images after converting and
-                        compressing?
-  --ratio_to_compress RATIO
-                        Ratio to compress size of image. Float number should
-                        be between 0. and 1.
-  --max_img_size NUM_BYTES
-                        Maximum size of each image in bytes.
-
-```
-
-## Delete image duplicates
-
-To delete image duplicate you can use script **find_similar_imgs.py** with parameters.
+There are 20 arch styles that our model can be classify:
+1. Авангард (The avant-garde)                                               
+1. Ар-деко (Art Deco)                                                
+1. Барокко (Baroque)                                                
+1. Брутализм (Brutalism)                                             
+1. Готика (Gothic)                                                  
+1. Деконструктивизм (Deconstructivism)                                        
+1. Древнерусская архитектура (Ancient Russian architecture)                             
+1. Капиталистический романтизм (Capitalist Romanticism)                           
+1. Кирпичный стиль (Brick style)                                        
+1. Классицизм (Classicism)                                             
+1. Модернизм (Modernism)
+1. Неоклассицизм (Neoclassicism)
+1. Неорусский стиль (Neo-Russian style)
+1. Постмодернизм (Postmodernism)
+1. Ренессанс (Renaissance)
+1. Романика (Romance)
+1. Русское барокко (Russian Baroque)
+1. Русское деревянное зодчество (Russian wooden architecture)
+1. Современная архитектура (Modern architecture)
+1. Узорочье (Uzorochye)

@@ -1,12 +1,11 @@
 import logging
 import sys
-from aiogram import Bot, Dispatcher, executor, types
+from aiogram import Bot, Dispatcher, executor, types, utils
 import aiohttp
 from PIL import Image
 from io import BytesIO
 import os
 import shutil
-
 
 from classifier.classifier_prediction import arch_style_predict_by_image, load_checkpoint
 
@@ -19,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-model_loaded, styles = load_checkpoint()
+model_loaded, styles = load_checkpoint(model_name='efficientnet-b5')
 
 styles_description = {
     'барокко': "https://ru.wikipedia.org/wiki/%D0%90%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0_%D0%B1%D0%B0%D1%80%D0%BE%D0%BA%D0%BA%D0%BE",
@@ -42,23 +41,23 @@ for style in styles:
 @dp.message_handler(commands=['start', 'help'])
 async def send_welcome(message: types.Message):
     await message.reply("Привет!"
-                        "\nЭтот бот умеет определять архитектурный стиль здания. "
-                        "Достаточно отправить фотографию."
+                        "\nЭтот бот умеет определять архитектурный стиль здания.\n" +
+                        utils.markdown.bold("Достаточно отправить фотографию") + "."
 
-                        f"\n\nБот различает {len(styles)} следующих архитектурных стилей:\n" +
-                        ",\n".join([s.replace('_', ' ').capitalize() for s in styles]) + "."
+                         f"\n\nБот различает {len(styles)} архитектурных стилей и возвращает"
+                         f" распределение вероятностей по топ-3 наиболее подходящим стилям."
+                        # + ",\n".join([s.replace('_', ' ').capitalize() for s in styles]) + "."
 
-                        "\n\n/styles - подробнее узнать об архитектурных стилях"
+                         "\n\n/styles - подробнее узнать об архитектурных стилях"
 
-                        "\n\nПоддержать автора 🤗"
-                        "\nhttps://archwalk.ru/donate"
+                         "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
 
-                        "\n\nПриходите экскурсии и лекции об архитектуре Москвы "
-                        "c Галиной Минаковой"
-                        "\nhttps://archwalk.ru"
+                         "\n\n[Приходите на экскурсии и лекции об архитектуре Москвы "
+                         "c Галиной Минаковой](https://archwalk.ru)"
                         # "\n\nПро создание бота можно прочитать на сайте "
                         # "Галины Минаковой https://archwalk.ru/about_bot"
                         ,
+                        parse_mode=types.ParseMode.MARKDOWN,
                         disable_web_page_preview=True,
                         reply=False)
     """
@@ -118,29 +117,39 @@ async def detect_style(file_image: types.file):
     top_3_styles_with_proba = arch_style_predict_by_image(img,
                                                           model=model_loaded,
                                                           class_names=styles,
-                                                          samples_for_voting=10)
+                                                          samples_for_voting=6,
+                                                          batch_size_voting=1,
+                                                          is_debug=True)
+
+    # Delete 'Остальные' before fnd maximum probability of classes
+    remain_class = {'Остальные': top_3_styles_with_proba.pop('Остальные')}
 
     top_1_style = max(top_3_styles_with_proba, key=lambda x: top_3_styles_with_proba[x])
+    top_3_styles_with_proba.update(remain_class)
 
     # Save image after classify to class folder on server
     save_image(img,
                folder_name=top_1_style,
                img_name=file_image['from'].username + '_' +
-                        file_image['date'].strftime('%Y_%m_%d-%H_%M_%S')+'.jpg'
+                        file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') + '.jpg'
                )
 
     top_1_style = top_1_style.replace('_', ' ').capitalize()
 
-    result_str = "\n\nРаспределение вероятностей по топ-3 стилям:\n"
+    result_str = "\n\nРаспределение вероятностей по топ-3 архитектурным стилям:\n"
     for style, proba in top_3_styles_with_proba.items():
-        result_str += f"{style.replace('_', ' ').capitalize()}: {proba:.03f}\n"
+        result_str += f"{utils.markdown.bold(style.replace('_', ' ').capitalize())} ~ {proba:.03f}\n"
 
-    await file_image.reply(f"Архитектурный стиль: {top_1_style}"
+    await file_image.reply(f"{utils.markdown.bold(top_1_style)}"
                            f"{result_str}"
                            "\n/styles - подробнее узнать об архитектурных стилях"
 
-                           "\n\nПоддержать автора 🤗"
-                           "\nhttps://archwalk.ru/donate",
+                           "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
+
+                           "\n\n[Приходите на экскурсии и лекции об архитектуре Москвы "
+                           "c Галиной Минаковой](https://archwalk.ru)"
+                           ,
+                           parse_mode=types.ParseMode.MARKDOWN,
                            disable_web_page_preview=True,
                            reply=True)
 
