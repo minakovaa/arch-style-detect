@@ -2,19 +2,16 @@
 .idea/
 *.debug
 *.warn
+*__pycache__
 bot-venv/
 
 dataset*
 
-classifier/*
-!classifier/classifier_prediction.py
-!classifier/__init__.py
+classifier/checkpoints/*
 
 bot/*
 !bot/bot.py
 !bot/__init__.py
-
-preprocess_img/__pycache__/
 
 Collab_notebook/
 
