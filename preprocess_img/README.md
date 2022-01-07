@@ -9,15 +9,15 @@ To convert images you can use script **convert_img.py** with parameters.
 
 For example, to convert all images in folder `/datadir` convert to **jpeg** and the result size of images
 equal to 80 percents of original image size. Delete source images if can save it in target format.
-`python convert_img.py --images-dir /datadir --target-ext jpeg`
+`python preprocess_imgs.py --images-dir /datadir --target-ext jpeg`
 
 OR result size of images equal to 80 percents of original image size. 
-`python convert_img.py --images-dir /datadir --target-ext jpeg --ratio-to-compress 0.8`
+`python preprocess_imgs.py --images-dir /datadir --target-ext jpeg --ratio-to-compress 0.8`
 
 OR result size of images is not greater than 128000 bytes. 
-`python convert_img.py --images-dir /datadir --target-ext jpeg --max-img-size 128000`
+`python preprocess_imgs.py --images-dir /datadir --target-ext jpeg --max-img-size 128000`
 
-And run `python convert_img.py -h` to show help:
+And run `python preprocess_imgs.py -h` to show help:
 
 ```
 usage: preprocess_imgs.py [-h] --images-dir DIR --target-ext EXT
