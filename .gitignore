@@ -11,6 +11,7 @@ classifier/checkpoints/*
 
 bot/*
 !bot/bot.py
+!bot/archstyles_weblinks.txt
 !bot/__init__.py
 
 Collab_notebook/

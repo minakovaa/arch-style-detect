@@ -19,7 +19,7 @@ def check_memory(info_str, logger):
     p = psutil.Process(os.getpid())
     mem_usage = p.memory_info().rss / 1024 / 1024
     # print(f"{info_str}: {mem_usage} MB")
-    logger.debug("%s: %s", info_str, mem_usage)
+    logger.debug("%s: %s MB", info_str, mem_usage)
 
 
 def load_checkpoint(checkpoint_path=None, device=None, model_name='efficientnet-b5'):
@@ -206,6 +206,6 @@ def arch_style_predict_by_image(img, model, class_names, logger,
     # other_ind = sorted_ind_by_proba[:-3][::-1]  # Indexes of remaining probabilities
 
     top_3_styles_probability = {class_names[i]: round(probabilities[i], 3) for i in top_3_ind}
-    top_3_styles_probability.update({'Остальные': round(1.0 - sum(top_3_styles_probability.values()), 3)})
+    top_3_styles_probability.update({'Остальные': abs(round(1.0 - sum(top_3_styles_probability.values()), 3))})
 
     return top_3_styles_probability

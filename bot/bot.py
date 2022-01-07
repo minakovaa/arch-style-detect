@@ -12,6 +12,7 @@ from PIL import Image
 
 from classifier.classifier_prediction import arch_style_predict_by_image, load_checkpoint
 
+FILEPATH_WITH_ARCHSTYLES_LINKS = "bot/archstyles_weblinks.txt"
 LOGGER_FILE_CONFIG = "bot_logging.conf.yml"
 
 logger = logging.getLogger("bot")
@@ -25,15 +26,9 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-model_loaded, styles = load_checkpoint(model_name='resnet18') #efficientnet-b5
+styles_description = {}  # Fill once in func main()
 
-styles_description = {
-    'барокко': "https://ru.wikipedia.org/wiki/%D0%90%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0_%D0%B1%D0%B0%D1%80%D0%BE%D0%BA%D0%BA%D0%BE",
-    'классицизм': "https://ru.wikipedia.org/wiki/%D0%9A%D0%BB%D0%B0%D1%81%D1%81%D0%B8%D1%86%D0%B8%D0%B7%D0%BC#%D0%90%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0",
-    'русское_барокко': "https://ru.wikipedia.org/wiki/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%BE%D0%B5_%D0%B1%D0%B0%D1%80%D0%BE%D0%BA%D0%BA%D0%BE",
-    'узорочье': "https://ru.wikipedia.org/wiki/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%BE%D0%B5_%D1%83%D0%B7%D0%BE%D1%80%D0%BE%D1%87%D1%8C%D0%B5",
-    'готика': "https://ru.wikipedia.org/wiki/%D0%93%D0%BE%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0",
-    'неоклассицизм_сталинского_периода': "https://ru.wikipedia.org/wiki/%D0%A1%D1%82%D0%B0%D0%BB%D0%B8%D0%BD%D1%81%D0%BA%D0%B0%D1%8F_%D0%B0%D1%80%D1%85%D0%B8%D1%82%D0%B5%D0%BA%D1%82%D1%83%D1%80%D0%B0"}
+model_loaded, styles = load_checkpoint(model_name='resnet18') #efficientnet-b5
 
 choose_styles_keyboard = types.InlineKeyboardMarkup(resize_keyboard=True,
                                                     one_time_keyboard=True,
@@ -61,11 +56,11 @@ async def send_welcome(message: types.Message):
                         "\nЭтот бот умеет определять архитектурный стиль здания.\n" +
                         utils.markdown.bold("Достаточно отправить фотографию") + "."
 
-                         f"\n\nБот различает {len(styles)} архитектурных стилей и возвращает"
+                         f"\n\nРазличает {len(styles)} архитектурных стилей и возвращает"
                          f" распределение вероятностей по топ-3 наиболее подходящим стилям."
                         # + ",\n".join([s.replace('_', ' ').capitalize() for s in styles]) + "."
 
-                         "\n\n/styles - подробнее узнать об архитектурных стилях"
+                         "\n\n/styles - список архитектурных стилей"
 
                          "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
 
@@ -80,6 +75,9 @@ async def send_welcome(message: types.Message):
 
 
 async def download_image(file_image: types.file):
+    """
+    Download image sent by user to bot
+    """
     file_id = max(file_image.photo, key=lambda p: p.file_size).file_id
 
     link_to_json = f"https://api.telegram.org/bot{API_TOKEN}/getFile?file_id={file_id}"
@@ -154,12 +152,17 @@ async def detect_style(file_image: types.file):
     top_1_style = top_1_style.replace('_', ' ').capitalize()
 
     result_str = "\n\nРаспределение вероятностей по топ-3 архитектурным стилям:\n"
+
+    global styles_description
     for style, proba in top_3_styles_with_proba.items():
-        result_str += f"{utils.markdown.bold(style.replace('_', ' ').capitalize())} ~ {proba:.03f}\n"
+        if style in styles_description:
+            result_str += f"[{style.replace('_', ' ').capitalize()}]({styles_description[style]}) ~ {proba:.03f}\n"
+        else:
+            result_str += f"{style.replace('_', ' ').capitalize()} ~ {proba:.03f}\n"
 
     await file_image.reply(f"{utils.markdown.bold(top_1_style)}"
                            f"{result_str}"
-                           "\n/styles - подробнее узнать об архитектурных стилях"
+                           "\n/styles - список архитектурных стилей"
 
                            "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
 
@@ -182,7 +185,11 @@ async def select_style(message: types.Message):
 
 @dp.callback_query_handler(lambda call: call.data in styles)
 async def get_style_description(callback_query: types.CallbackQuery):
-    # Скрываем кнопки после выбора стиля и возвращаем описание
+    """
+    Скрываем кнопки после выбора стиля и возвращаем описание
+    """
+    global styles_description
+
     await bot.edit_message_reply_markup(chat_id=callback_query.message.chat.id,
                                         message_id=callback_query.message.message_id)
 
@@ -191,7 +198,29 @@ async def get_style_description(callback_query: types.CallbackQuery):
                                        reply=False)
 
 
-if __name__ == '__main__':
-    setup_logging(LOGGER_FILE_CONFIG)
+def read_links_with_styles_description_from_file():
+    """
+    Считываем из файла FILEPATH_WITH_ARCHSTYLES_LINKS список
+    архитектурных стилей и ссылки на странички с их описанием.
+
+    styles_description = {'архстиль':'https://...'}
+    """
+
+    global styles_description
+
+    with open(FILEPATH_WITH_ARCHSTYLES_LINKS, "r") as fin:
+        lines = fin.readlines()
+        for line in lines:
+            style_name, weblink = line.strip().split(',')
+            styles_description[style_name] = weblink
+
+
+def main():
+    # setup_logging(LOGGER_FILE_CONFIG)
+    read_links_with_styles_description_from_file()
 
     executor.start_polling(dp, skip_updates=True)
+
+
+if __name__ == '__main__':
+    main()
