@@ -12,6 +12,9 @@ from PIL import Image
 
 from classifier.classifier_prediction import arch_style_predict_by_image, load_checkpoint
 
+# Maximum size of received image. If greater then image should be downscaled
+MAX_IMG_SIZE = 1024
+
 FILEPATH_WITH_ARCHSTYLES_LINKS = "bot/archstyles_weblinks.txt"
 LOGGER_FILE_CONFIG = "bot_logging.conf.yml"
 
@@ -96,6 +99,9 @@ async def download_image(file_image: types.file):
             async with session.get(url=link_to_image, ssl=False) as response:
                 img_stream = await response.read()
                 img = Image.open(BytesIO(img_stream))
+
+    if max(img.size) > MAX_IMG_SIZE:
+        img.thumbnail((MAX_IMG_SIZE, MAX_IMG_SIZE), Image.ANTIALIAS)
 
     return img
 

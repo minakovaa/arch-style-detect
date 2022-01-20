@@ -9,12 +9,14 @@ dataset*
 
 classifier/checkpoints/*
 
+train-plots*
+
 bot/*
 !bot/bot.py
 !bot/archstyles_weblinks.txt
 !bot/__init__.py
 
-Collab_notebook/
+*.ipynb
 
 test_one_img.py
 image_transformer.py

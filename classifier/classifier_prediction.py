@@ -10,8 +10,6 @@ import numpy as np
 from scipy.special import softmax
 from efficientnet_pytorch import EfficientNet
 
-# clf_img_size: Final image size that apply in transform
-clf_image_size = 224
 advprop = False  # For models using advprop pretrained weights different normalization
 
 
@@ -26,27 +24,21 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='efficientnet-
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    global clf_image_size
     global advprop
 
     if checkpoint_path is None:
         if model_name == 'resnet18':
             checkpoint_path = "classifier/checkpoints/model_arch_test_new_50_epoch.pt"  # test acc voited = 0.9217
-            clf_image_size = 224
 
         elif model_name == 'resnet152':
             checkpoint_path = "classifier/checkpoints/model_resnet152_gray_0_5_num_1.pt"
-            clf_image_size = 224
 
         elif model_name == 'efficientnet-b5':
             advprop = True
-
             checkpoint_path = 'classifier/checkpoints/model_advprop_efficientnet-b5_num_1.pt'
-            clf_image_size = EfficientNet.get_image_size(model_name)
 
         elif model_name == 'efficientnet-b6':
             checkpoint_path = 'classifier/checkpoints/model_efficientnet-b6_num_1.pt'
-            clf_image_size = EfficientNet.get_image_size(model_name)
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
     class_names = checkpoint['class_names']
@@ -99,7 +91,6 @@ def classifier_predict(model, input_img, logger, device=None, is_debug=False):
                                          std=[0.229, 0.224, 0.225])
 
     transform_evaluate = transforms.Compose([
-        transforms.RandomResizedCrop(clf_image_size, scale=(1., 1.), ratio=(1., 1.)),
         transforms.ToTensor(),
         normalize  # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
@@ -140,7 +131,6 @@ def classifier_predict_voting(model, input_img, logger, num_samples=18, batch_si
                                          std=[0.229, 0.224, 0.225])
 
     transform_for_voting = transforms.Compose([
-        transforms.RandomResizedCrop(clf_image_size),
         transforms.ToTensor(),
         normalize  # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
