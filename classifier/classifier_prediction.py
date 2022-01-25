@@ -10,6 +10,8 @@ import numpy as np
 from scipy.special import softmax
 from efficientnet_pytorch import EfficientNet
 
+CLASS_REMAIN = 'Остальные'
+
 advprop = False  # For models using advprop pretrained weights different normalization
 
 
@@ -17,7 +19,8 @@ def check_memory(info_str, logger):
     p = psutil.Process(os.getpid())
     mem_usage = p.memory_info().rss / 1024 / 1024
     # print(f"{info_str}: {mem_usage} MB")
-    logger.debug("%s: %s MB", info_str, mem_usage)
+    if logger is not None:
+        logger.debug("%s: %s MB", info_str, mem_usage)
 
 
 def load_checkpoint(checkpoint_path=None, device=None, model_name='efficientnet-b5'):
@@ -28,17 +31,20 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='efficientnet-
 
     if checkpoint_path is None:
         if model_name == 'resnet18':
-            checkpoint_path = "classifier/checkpoints/model_arch_test_new_50_epoch.pt"  # test acc voited = 0.9217
+            checkpoint_path = "checkpoints/model_arch_test_new_50_epoch.pt"  # test acc voited = 0.9217
+
+        if model_name == 'resnet50':
+            checkpoint_path = "checkpoints/resnet50_batch_16_imgsize_600_SGD.pt"
 
         elif model_name == 'resnet152':
-            checkpoint_path = "classifier/checkpoints/model_resnet152_gray_0_5_num_1.pt"
+            checkpoint_path = "checkpoints/model_resnet152_gray_0_5_num_1.pt"
 
         elif model_name == 'efficientnet-b5':
             advprop = True
-            checkpoint_path = 'classifier/checkpoints/model_advprop_efficientnet-b5_num_1.pt'
+            checkpoint_path = 'checkpoints/model_advprop_efficientnet-b5_num_1.pt'
 
         elif model_name == 'efficientnet-b6':
-            checkpoint_path = 'classifier/checkpoints/model_efficientnet-b6_num_1.pt'
+            checkpoint_path = 'checkpoints/model_efficientnet-b6_num_1.pt'
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
     class_names = checkpoint['class_names']
@@ -48,6 +54,11 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='efficientnet-
 
     if model_name == 'resnet18':
         model_loaded = models.resnet18(pretrained=False)  # resnet18  # resnet152 # wide_resnet101_2
+        num_ftrs = model_loaded.fc.in_features
+        model_loaded.fc = nn.Linear(num_ftrs, num_classes)
+
+    if model_name == 'resnet50':
+        model_loaded = models.resnet50(pretrained=False)  # resnet18  # resnet152 # wide_resnet101_2
         num_ftrs = model_loaded.fc.in_features
         model_loaded.fc = nn.Linear(num_ftrs, num_classes)
 
@@ -96,14 +107,10 @@ def classifier_predict(model, input_img, logger, device=None, is_debug=False):
     ])
 
     tensor_img = transform_evaluate(input_img)
-
     inputs = tensor_img.to(device)
-
-    inputs = torch.unsqueeze(inputs, 0)  # one image as batch
-
+    inputs = torch.unsqueeze(inputs, 0)  # make one batch with one image
     outputs = model(inputs)
-
-    _, preds = torch.max(outputs, 1) # top_1 predicted class
+    _, preds = torch.max(outputs, 1)  # top_1 predicted class
 
     if is_debug:
         check_memory('classifier_predict_3', logger)
@@ -195,7 +202,9 @@ def arch_style_predict_by_image(img, model, class_names, logger,
     top_3_ind = sorted_ind_by_proba[-3:][::-1]
     # other_ind = sorted_ind_by_proba[:-3][::-1]  # Indexes of remaining probabilities
 
-    top_3_styles_probability = {class_names[i]: round(probabilities[i], 3) for i in top_3_ind}
-    top_3_styles_probability.update({'Остальные': abs(round(1.0 - sum(top_3_styles_probability.values()), 3))})
+    top_3_styles_probability = {class_names[i]: f"{probabilities[i]:.02f}" for i in top_3_ind}
+    top_3_styles_probability.update({
+        CLASS_REMAIN: str(abs(round(1.0 - sum(map(float, top_3_styles_probability.values())), 2)))
+    })
 
     return top_3_styles_probability

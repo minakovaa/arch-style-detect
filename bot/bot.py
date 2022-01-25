@@ -10,17 +10,19 @@ from aiogram import Bot, Dispatcher, executor, types, utils
 import aiohttp
 from PIL import Image
 
-from classifier.classifier_prediction import arch_style_predict_by_image, load_checkpoint
+from classifier.classifier_prediction import load_checkpoint, CLASS_REMAIN
 
 # Maximum size of received image. If greater then image should be downscaled
 MAX_IMG_SIZE = 1024
+STATUS_CODE_OK = 200
 
 FILEPATH_WITH_ARCHSTYLES_LINKS = "bot/archstyles_weblinks.txt"
 LOGGER_FILE_CONFIG = "bot_logging.conf.yml"
 
 logger = logging.getLogger("bot")
 
-API_TOKEN = sys.argv[1]  # 'BOT TOKEN HERE'
+API_TOKEN = sys.argv[1]  # Bot token
+LINK_TO_CLF_API = sys.argv[2]  # Link to classifier api
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,7 +33,8 @@ dp = Dispatcher(bot)
 
 styles_description = {}  # Fill once in func main()
 
-model_loaded, styles = load_checkpoint(model_name='resnet18') #efficientnet-b5
+model_loaded, styles = load_checkpoint(checkpoint_path="classifier/checkpoints/resnet50_batch_16_imgsize_600_SGD.pt",
+                                       model_name='resnet50') #efficientnet-b5
 
 choose_styles_keyboard = types.InlineKeyboardMarkup(resize_keyboard=True,
                                                     one_time_keyboard=True,
@@ -56,10 +59,9 @@ async def send_welcome(message: types.Message):
     This handler will be called when user sends `/start` or `/help` command
     """
     await message.reply("Привет!"
-                        "\nЭтот бот умеет определять архитектурный стиль здания.\n" +
-                        utils.markdown.bold("Достаточно отправить фотографию") + "."
-
-                         f"\n\nРазличает {len(styles)} архитектурных стилей и возвращает"
+                        "\nЭтот бот умеет определять архитектурный стиль здания."
+                        "\nДостаточно отправить фотографию." +
+                         f"\n\nРазличает {len(styles)} архитектурный стиль и возвращает"
                          f" распределение вероятностей по топ-3 наиболее подходящим стилям."
                         # + ",\n".join([s.replace('_', ' ').capitalize() for s in styles]) + "."
 
@@ -103,7 +105,10 @@ async def download_image(file_image: types.file):
     if max(img.size) > MAX_IMG_SIZE:
         img.thumbnail((MAX_IMG_SIZE, MAX_IMG_SIZE), Image.ANTIALIAS)
 
-    return img
+    bytes_io = BytesIO()
+    img.save(bytes_io, format='JPEG')
+    img_bytes = bytes_io.getvalue()
+    return img_bytes
 
 
 def save_image(img, folder_name, img_name):
@@ -123,6 +128,9 @@ def save_image(img, folder_name, img_name):
     if not os.path.exists(path_folder):
         os.mkdir(path=path_folder)
 
+    if isinstance(img, bytes):
+        img = Image.open(BytesIO(img))
+
     img.save(os.path.join(path_folder, img_name), 'JPEG')
 
     logger.debug("Save image %s", img_name)
@@ -130,51 +138,45 @@ def save_image(img, folder_name, img_name):
 
 @dp.message_handler(content_types=['photo'])
 async def detect_style(file_image: types.file):
-    # Get image from user
-    img = await download_image(file_image)
+    # Get image bytes from user
+    img_bytes = await download_image(file_image)
 
-    # Predict arch styles
-    top_3_styles_with_proba = arch_style_predict_by_image(img,
-                                                          model=model_loaded,
-                                                          class_names=styles,
-                                                          logger=logger,
-                                                          samples_for_voting=6,
-                                                          batch_size_voting=1,
-                                                          is_debug=True)
+    # Predict arch styles with Flask-api
+    top_3_styles_with_proba = None
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url=LINK_TO_CLF_API, data=img_bytes,
+                                headers={'content-type': 'image/jpeg'}) as response:
+            top_3_styles_with_proba = await response.json()
 
-    # Delete 'Остальные' before fnd maximum probability of classes
-    remain_class = {'Остальные': top_3_styles_with_proba.pop('Остальные')}
+    if top_3_styles_with_proba is None:
+        return await file_image.reply("Упс.. 🥲 Неполадки на сервере, попробуйте повторить позже.", reply=False)
 
-    top_1_style = max(top_3_styles_with_proba, key=lambda x: top_3_styles_with_proba[x])
+    # Delete CLASS_REMAIN='Остальные' before find maximum probability of classes
+    remain_class = {CLASS_REMAIN: top_3_styles_with_proba.pop(CLASS_REMAIN)}
+    sorted_arch_styles = sorted(top_3_styles_with_proba, key=lambda x: int(top_3_styles_with_proba[x]), reverse=True)
     top_3_styles_with_proba.update(remain_class)
 
+    top_1_style = sorted_arch_styles[0]
     # Save image after classify to class folder on server
-    save_image(img,
-               folder_name=top_1_style,
+    save_image(img_bytes, folder_name=top_1_style,
                img_name=file_image['from'].username + '_' +
                         file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') + '.jpg'
                )
 
-    top_1_style = top_1_style.replace('_', ' ').capitalize()
-
-    result_str = "\n\nРаспределение вероятностей по топ-3 архитектурным стилям:\n"
+    result_str = "\n\nНаиболее вероятные архитектурные стили:\n"
 
     global styles_description
-    for style, proba in top_3_styles_with_proba.items():
+    for style in sorted_arch_styles + [CLASS_REMAIN]:
+        proba = top_3_styles_with_proba[style]
         if style in styles_description:
-            result_str += f"[{style.replace('_', ' ').capitalize()}]({styles_description[style]}) ~ {proba:.03f}\n"
+            result_str += f"[{style.replace('_', ' ').capitalize()}]({styles_description[style]}) ~ {proba}%\n"
         else:
-            result_str += f"{style.replace('_', ' ').capitalize()} ~ {proba:.03f}\n"
+            result_str += f"{style.replace('_', ' ').capitalize()} ~ {proba}%\n"
 
-    await file_image.reply(f"{utils.markdown.bold(top_1_style)}"
+    await file_image.reply(f"{utils.markdown.bold(top_1_style.replace('_', ' ').capitalize())}"
                            f"{result_str}"
                            "\n/styles - список архитектурных стилей"
-
-                           "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
-
-                           "\n\n[Приходите на экскурсии и лекции об архитектуре Москвы "
-                           "c Галиной Минаковой](https://archwalk.ru)"
-                           ,
+                           "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)",
                            parse_mode=types.ParseMode.MARKDOWN,
                            disable_web_page_preview=True,
                            reply=True)
