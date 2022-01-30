@@ -1,11 +1,12 @@
-# Useful scripts to preprocess images
+# Convert images to another format and delete duplicates
+
+With script **preprocess_img/preprocess_imgs.py** 
+you can preprocess you image datasets:
  - Convert images to another format
+ - Reduce images sizes
  - Find similar images and delete image duplicates 
 
-## Convert images to another format and delete duplicates
-
-To convert images you can use script **convert_img.py** with parameters.
-
+You can use script **preprocess_imgs.py** with parameters:
 
 For example, to convert all images in folder `/datadir` convert to **jpeg** and the result size of images
 equal to 80 percents of original image size. Delete source images if can save it in target format.

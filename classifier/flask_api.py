@@ -4,7 +4,6 @@ import logging.config
 
 from PIL import Image
 from flask import Flask, jsonify, request
-from flask.logging import default_handler
 
 import yaml
 

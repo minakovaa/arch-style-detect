@@ -1,5 +1,4 @@
 import os
-import gc
 import psutil
 import logging
 
