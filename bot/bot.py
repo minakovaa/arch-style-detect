@@ -17,21 +17,17 @@ MAX_IMG_SIZE = 1024
 STATUS_CODE_OK = 200
 
 FILEPATH_WITH_ARCHSTYLES_LINKS = "bot/archstyles_weblinks.txt"
-LOGGER_FILE_CONFIG = "bot_logging.conf.yml"
-
-logger = logging.getLogger("bot")
+LOGGER_FILE_CONFIG = "logging.conf.yml"
 
 API_TOKEN = sys.argv[1]  # Bot token
 LINK_TO_CLF_API = sys.argv[2]  # Link to classifier api
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 
 # Initialize bot and dispatcher
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-styles_description = {}  # Fill once in func main()
+# Fill once in func main()
+styles_description = {}
 
 model_loaded, styles = load_checkpoint(checkpoint_path="classifier/checkpoints/resnet50_batch_16_imgsize_600_SGD.pt",
                                        model_name='resnet50') #efficientnet-b5
@@ -48,6 +44,12 @@ for style in styles:
 
 def setup_logging(logging_yaml_config_fpath):
     """setup logging via YAML if it is provided"""
+    global logger
+
+    logger = logging.getLogger("bot")
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+
     if logging_yaml_config_fpath:
         with open(logging_yaml_config_fpath) as config_fin:
             logging.config.dictConfig(yaml.safe_load(config_fin))
@@ -133,7 +135,7 @@ def save_image(img, folder_name, img_name):
 
     img.save(os.path.join(path_folder, img_name), 'JPEG')
 
-    logger.debug("Save image %s", img_name)
+    logger.debug("Save image %s size %sx%s", img_name, img.size[0], img.size[1])
 
 
 @dp.message_handler(content_types=['photo'])
@@ -224,7 +226,7 @@ def read_links_with_styles_description_from_file():
 
 
 def main():
-    # setup_logging(LOGGER_FILE_CONFIG)
+    setup_logging(LOGGER_FILE_CONFIG)
     read_links_with_styles_description_from_file()
 
     executor.start_polling(dp, skip_updates=True)
