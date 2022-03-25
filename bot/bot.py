@@ -4,14 +4,17 @@ import sys
 from io import BytesIO
 import os
 import shutil
-import gc
 
 import yaml
 from aiogram import Bot, Dispatcher, executor, types, utils
 import aiohttp
 from PIL import Image
 
-from classifier.classifier_prediction import load_checkpoint, CLASS_REMAIN
+from classifier.classifier_prediction import (
+    predict_image_bytes, load_checkpoint, check_memory, CLASS_REMAIN,
+)
+
+model_loaded, styles = load_checkpoint(model_name='resnet18')
 
 # Maximum size of received image. If greater then image should be downscaled
 MAX_IMG_SIZE = 1024
@@ -30,16 +33,9 @@ dp = Dispatcher(bot)
 # Fill once in func main()
 styles_description = {}
 
-_, styles = load_checkpoint(model_name='resnet18')  # efficientnet-b5
-
 choose_styles_keyboard = types.InlineKeyboardMarkup(resize_keyboard=True,
                                                     one_time_keyboard=True,
                                                     reply=False)
-
-for style in styles:
-    button_name = style.replace('_', ' ').capitalize()
-    button_style = types.InlineKeyboardButton(button_name, callback_data=style)
-    choose_styles_keyboard.add(button_style)
 
 
 def setup_logging(logging_yaml_config_fpath):
@@ -63,9 +59,9 @@ async def send_welcome(message: types.Message):
     await message.reply("Привет!"
                         "\nЭтот бот умеет определять архитектурный стиль здания."
                         "\nДостаточно отправить фотографию." +
-                        f"\n\nРазличает {len(styles)} архитектурный стиль и возвращает"
+                        f"\n\nРазличает {len(styles_description)} архитектурный стиль и возвращает"
                         f" распределение вероятностей по топ-3 наиболее подходящим стилям."
-                        # + ",\n".join([s.replace('_', ' ').capitalize() for s in styles]) + "."
+                        # + ",\n".join([s.replace('_', ' ').capitalize() for s in styles_description.keys()]) + "."
 
                         "\n\n/styles - список архитектурных стилей"
 
@@ -143,15 +139,19 @@ async def detect_style(file_image: types.file):
     # Get image bytes from user
     img_bytes = await download_image(file_image)
 
-    # Predict arch styles with Flask-api
-    top_3_styles_with_proba = None
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url=LINK_TO_CLF_API, data=img_bytes,
-                                headers={'content-type': 'image/jpeg'}) as response:
-            top_3_styles_with_proba = await response.json()
+    # # Request arch styles with Flask-api
+    # top_3_styles_with_proba = None
+    # async with aiohttp.ClientSession() as session:
+    #     async with session.post(url=LINK_TO_CLF_API, data=img_bytes,
+    #                             headers={'content-type': 'image/jpeg'}) as response:
+    #         top_3_styles_with_proba = await response.json()
+
+    top_3_styles_with_proba = predict_image_bytes(model_loaded, styles, img_bytes)  # Request arch styles directly from model
 
     if top_3_styles_with_proba is None:
         return await file_image.reply("Упс.. 🥲 Неполадки на сервере, попробуйте повторить позже.", reply=False)
+
+    check_memory("recieve flask request")
 
     # Delete CLASS_REMAIN='Остальные' before find maximum probability of classes
     remain_class = {CLASS_REMAIN: top_3_styles_with_proba.pop(CLASS_REMAIN)}
@@ -159,12 +159,12 @@ async def detect_style(file_image: types.file):
     top_3_styles_with_proba.update(remain_class)
 
     top_1_style = sorted_arch_styles[0]
-    # # Save image after classify to class folder on server
-    #
-    # save_image(img_bytes, folder_name=top_1_style,
-    #            img_name=file_image['from'].username + '_time_' +
-    #                     file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') + '.jpg'
-    #            )
+
+    # Save image after classify to class folder on server
+    save_image(img_bytes, folder_name=top_1_style,
+               img_name=file_image['from'].username + '_time_' +
+                        file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') + '.jpg'
+               )
 
     result_str = "\n\nНаиболее вероятные архитектурные стили:\n"
 
@@ -177,8 +177,6 @@ async def detect_style(file_image: types.file):
         else:
             result_str += f"{style.replace('_', ' ').capitalize()} ~ {proba}%\n"
 
-    gc.collect()
-
     await file_image.reply(f"{utils.markdown.bold(top_1_style.replace('_', ' ').capitalize())}"
                            f"{result_str}"
                            "\n/styles - список архитектурных стилей"
@@ -190,14 +188,14 @@ async def detect_style(file_image: types.file):
 
 @dp.message_handler(commands=['styles'])
 async def select_style(message: types.Message):
-    types.ReplyKeyboardMarkup(styles)
+    types.ReplyKeyboardMarkup(styles_description.keys())
 
     await message.reply("Про какой архитектурный стиль рассказать подробнее?",
                         reply_markup=choose_styles_keyboard,
                         reply=False)
 
 
-@dp.callback_query_handler(lambda call: call.data in styles)
+@dp.callback_query_handler(lambda call: call.data in styles_description.keys())
 async def get_style_description(callback_query: types.CallbackQuery):
     """
     Скрываем кнопки после выбора стиля и возвращаем описание
@@ -227,6 +225,20 @@ def read_links_with_styles_description_from_file():
         for line in lines:
             style_name, weblink = line.strip().split(',')
             styles_description[style_name] = weblink
+
+    if len(styles_description.keys()) > 0:
+        create_bottoms_with_styles(styles_description.keys())
+
+
+def create_bottoms_with_styles(styles):
+    """
+    Fill  global 'choose_styles_keyboard'
+    """
+    # Create buttoms
+    for style in styles:
+        button_name = style.replace('_', ' ').capitalize()
+        button_style = types.InlineKeyboardButton(button_name, callback_data=style)
+        choose_styles_keyboard.add(button_style)
 
 
 def main():

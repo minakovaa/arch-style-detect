@@ -1,6 +1,7 @@
 import io
 import logging
 import logging.config
+import gc
 
 from PIL import Image
 from flask import Flask, jsonify, request
@@ -10,7 +11,7 @@ import yaml
 
 from classifier_prediction import arch_style_predict_by_image, load_checkpoint, CLASS_REMAIN
 
-model_loaded, styles = load_checkpoint(model_name='resnet18')  # efficientnet-b5
+# model_loaded, styles = load_checkpoint(model_name='resnet18')  # efficientnet-b5
 
 app = Flask(__name__)
 
@@ -27,10 +28,15 @@ def predict_image():
     img = Image.open(io.BytesIO(img_bytes))
 
     logger.info("Start predict image %sx%s class", img.size[0], img.size[1])
+    model_loaded, styles = load_checkpoint(model_name='resnet18')
     prediction_top_3_styles_with_proba = arch_style_predict_by_image(img,
                                                                      model=model_loaded,
                                                                      class_names=styles,
                                                                      is_debug=True)
+
+    del model_loaded
+    gc.collect()
+
     logger.info("Finish predict image class")
     logger.info("Predictions: %s ", prediction_top_3_styles_with_proba)
 
@@ -64,7 +70,7 @@ def setup_logging(logging_yaml_config_fpath, logging_level=logging.INFO):
 
 def main():
     setup_logging(LOGGING_CONF_FILE, logging_level=logging.INFO)
-    # app.run(host='0.0.0.0', port=5000)
+    #app.run(host='0.0.0.0', port=5000)
     serve(app, host="0.0.0.0", port=5000)
 
 

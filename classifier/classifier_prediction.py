@@ -1,12 +1,14 @@
 import os
 import psutil
 import logging
+import io
 
 import torch
 import torch.nn as nn
 from torchvision import models, transforms
 from scipy.special import softmax
-import gc
+from PIL import Image
+
 # from efficientnet_pytorch import EfficientNet
 
 CLASS_REMAIN = 'Остальные'
@@ -74,9 +76,7 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='resnet18'):
     #     model_loaded = EfficientNet.from_pretrained('efficientnet-b6', num_classes=num_classes)
 
     model_loaded = model_loaded.to(device)
-
     model_loaded.load_state_dict(checkpoint['model_state_dict'])
-
     model_loaded.eval()
 
     return model_loaded, class_names
@@ -109,8 +109,6 @@ def classifier_predict(model, input_img, device=None, is_debug=False):
     if is_debug:
         check_memory('classifier_predict_finish')
 
-    gc.collect()
-
     return preds, outputs.squeeze().detach().numpy()
 
 
@@ -128,3 +126,23 @@ def arch_style_predict_by_image(img, model, class_names, is_debug=False):
     })
 
     return top_3_styles_probability
+
+
+def predict_image_bytes(model, styles, img_bytes):
+    if not img_bytes:
+        return None
+
+    img = Image.open(io.BytesIO(img_bytes))
+
+    logger.info("Start predict image %sx%s class", img.size[0], img.size[1])
+    prediction_top_3_styles_with_proba = arch_style_predict_by_image(img,
+                                                                     model=model,
+                                                                     class_names=styles,
+                                                                     is_debug=True)
+    logger.info("Finish predict image class")
+    logger.info("Predictions: %s ", prediction_top_3_styles_with_proba)
+
+    prediction_top_3_styles_with_proba = {class_name: f"{int(100 * float(proba))}" for class_name, proba
+                                          in prediction_top_3_styles_with_proba.items()}
+
+    return prediction_top_3_styles_with_proba
