@@ -4,6 +4,7 @@ import sys
 from io import BytesIO
 import os
 import shutil
+import gc
 
 import yaml
 from aiogram import Bot, Dispatcher, executor, types, utils
@@ -158,11 +159,12 @@ async def detect_style(file_image: types.file):
     top_3_styles_with_proba.update(remain_class)
 
     top_1_style = sorted_arch_styles[0]
-    # Save image after classify to class folder on server
-    save_image(img_bytes, folder_name=top_1_style,
-               img_name=file_image['from'].username + '_time_' +
-                        file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') + '.jpg'
-               )
+    # # Save image after classify to class folder on server
+    #
+    # save_image(img_bytes, folder_name=top_1_style,
+    #            img_name=file_image['from'].username + '_time_' +
+    #                     file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') + '.jpg'
+    #            )
 
     result_str = "\n\nНаиболее вероятные архитектурные стили:\n"
 
@@ -174,6 +176,8 @@ async def detect_style(file_image: types.file):
             result_str += f"[{style.replace('_', ' ').capitalize()}]({styles_description[style]}) ~ {proba}%\n"
         else:
             result_str += f"{style.replace('_', ' ').capitalize()} ~ {proba}%\n"
+
+    gc.collect()
 
     await file_image.reply(f"{utils.markdown.bold(top_1_style.replace('_', ' ').capitalize())}"
                            f"{result_str}"
