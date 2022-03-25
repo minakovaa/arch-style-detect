@@ -1,11 +1,1 @@
-Pillow~=8.2.0
-aiogram~=2.13
-aiohttp~=3.7.4.post0
-torch~=1.9.0
-torchvision~=0.10.0
-numpy~=1.20.3
-scipy~=1.6.3
-ImageHash~=4.2.0
-psutil
-pyyaml
-Flask
+    Pillow~=8.2.0 aiogram~=2.13 aiohttp~=3.7.4.post0 torch~=1.9.0 torchvision~=0.10.0 numpy~=1.20.3 scipy~=1.6.3 ImageHash~=4.2.0 psutil pyyaml Flask

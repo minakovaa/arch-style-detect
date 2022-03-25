@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from torchvision import models, transforms
 from scipy.special import softmax
+import gc
 # from efficientnet_pytorch import EfficientNet
 
 CLASS_REMAIN = 'Остальные'
@@ -76,14 +77,14 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='resnet18'):
 
     model_loaded.load_state_dict(checkpoint['model_state_dict'])
 
+    model_loaded.eval()
+
     return model_loaded, class_names
 
 
 def classifier_predict(model, input_img, device=None, is_debug=False):
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    model.eval()
 
     if is_debug:
         check_memory('classifier_predict_start')
@@ -107,6 +108,8 @@ def classifier_predict(model, input_img, device=None, is_debug=False):
 
     if is_debug:
         check_memory('classifier_predict_finish')
+
+    gc.collect()
 
     return preds, outputs.squeeze().detach().numpy()
 
