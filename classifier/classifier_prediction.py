@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torchvision import models, transforms
 from scipy.special import softmax
-from efficientnet_pytorch import EfficientNet
+# from efficientnet_pytorch import EfficientNet
 
 CLASS_REMAIN = 'Остальные'
 
@@ -22,7 +22,7 @@ def check_memory(info_str):
     logger.debug("%s: %s MB", info_str, mem_usage)
 
 
-def load_checkpoint(checkpoint_path=None, device=None, model_name='efficientnet-b5'):
+def load_checkpoint(checkpoint_path=None, device=None, model_name='resnet18'):
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -30,20 +30,20 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='efficientnet-
 
     if checkpoint_path is None:
         if model_name == 'resnet18':
-            checkpoint_path = "classifier/checkpoints/model_arch_test_new_50_epoch.pt"
+            checkpoint_path = "classifier/checkpoints_prod/resnet_18_b_32_img_500_Adam_sched_wd_-07_lr_005.pt"
 
         if model_name == 'resnet50':
-            checkpoint_path = "classifier/checkpoints/resnet50_batch_16_imgsize_600_SGD.pt"
+            checkpoint_path = "classifier/checkpoints_prod/resnet50_batch_16_imgsize_600_SGD.pt"
 
         elif model_name == 'resnet152':
-            checkpoint_path = "classifier/checkpoints/model_resnet152_gray_0_5_num_1.pt"
+            checkpoint_path = "classifier/checkpoints_prod/model_resnet152_gray_0_5_num_1.pt"
 
-        elif model_name == 'efficientnet-b5':
-            advprop = True
-            checkpoint_path = 'classifier/checkpoints/model_advprop_efficientnet-b5_num_1.pt'
-
-        elif model_name == 'efficientnet-b6':
-            checkpoint_path = 'classifier/checkpoints/model_efficientnet-b6_num_1.pt'
+        # elif model_name == 'efficientnet-b5':
+        #     advprop = True
+        #     checkpoint_path = 'classifier/checkpoints/model_advprop_efficientnet-b5_num_1.pt'
+        #
+        # elif model_name == 'efficientnet-b6':
+        #     checkpoint_path = 'classifier/checkpoints/model_efficientnet-b6_num_1.pt'
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
     class_names = checkpoint['class_names']
@@ -66,18 +66,15 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='efficientnet-
         num_ftrs = model_loaded.fc.in_features
         model_loaded.fc = nn.Linear(num_ftrs, num_classes)
 
-    elif model_name == 'efficientnet-b5':
-        model_loaded = EfficientNet.from_pretrained('efficientnet-b5', num_classes=num_classes)
-
-    elif model_name == 'efficientnet-b6':
-        model_loaded = EfficientNet.from_pretrained('efficientnet-b6', num_classes=num_classes)
+    # elif model_name == 'efficientnet-b5':
+    #     model_loaded = EfficientNet.from_pretrained('efficientnet-b5', num_classes=num_classes)
+    #
+    # elif model_name == 'efficientnet-b6':
+    #     model_loaded = EfficientNet.from_pretrained('efficientnet-b6', num_classes=num_classes)
 
     model_loaded = model_loaded.to(device)
 
     model_loaded.load_state_dict(checkpoint['model_state_dict'])
-
-    # del checkpoint
-    # gc.collect()
 
     return model_loaded, class_names
 

@@ -4,12 +4,13 @@ import logging.config
 
 from PIL import Image
 from flask import Flask, jsonify, request
+from waitress import serve
 
 import yaml
 
 from classifier_prediction import arch_style_predict_by_image, load_checkpoint, CLASS_REMAIN
 
-model_loaded, styles = load_checkpoint(model_name='resnet50') #efficientnet-b5
+model_loaded, styles = load_checkpoint(model_name='resnet18')  # efficientnet-b5
 
 app = Flask(__name__)
 
@@ -54,7 +55,7 @@ def setup_logging(logging_yaml_config_fpath, logging_level=logging.INFO):
     logging.basicConfig(level=logging_level)
 
     log = logging.getLogger('werkzeug')
-    log.setLevel(logging.INFO)
+    log.setLevel(logging.WARNING)
 
     if logging_yaml_config_fpath:
         with open(logging_yaml_config_fpath) as config_fin:
@@ -63,7 +64,8 @@ def setup_logging(logging_yaml_config_fpath, logging_level=logging.INFO):
 
 def main():
     setup_logging(LOGGING_CONF_FILE, logging_level=logging.INFO)
-    app.run(debug=False, host='0.0.0.0')
+    # app.run(host='0.0.0.0', port=5000)
+    serve(app, host="0.0.0.0", port=5000)
 
 
 if __name__ == '__main__':

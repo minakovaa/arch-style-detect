@@ -1,7 +1,7 @@
 version: 1
 formatters:
   simple:
-    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format: "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
 handlers:
   file_debug_handler:
     class: logging.FileHandler
@@ -22,7 +22,7 @@ loggers:
   bot:
     level: DEBUG
     handlers: [file_debug_handler, file_warning_handler, stream_handler]
-    propagate: yes
+    propagate: no
   flask_api:
     level: DEBUG
     handlers: [file_debug_handler, file_warning_handler, stream_handler]

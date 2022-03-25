@@ -5,13 +5,13 @@
 готика,https://archwalk.ru/archstyle/gothic
 деконструктивизм,https://archwalk.ru/archstyle/deconstructivism
 древнерусская_архитектура,https://archwalk.ru/archstyle/old-russian
-капиталистический_романтизм,https://archwalk.ru/archstyle/caprom
-кирпичный_стиль,https://archwalk.ru/archstyle/brick
+капиталистический_романтизм,https://archwalk.ru/archstyle/caprom
+кирпичный_стиль,https://archwalk.ru/archstyle/brick
 классицизм,https://archwalk.ru/archstyle/classicism
 модерн,https://archwalk.ru/archstyle/modern
 модернизм,https://archwalk.ru/archstyle/modernism
 неоклассицизм,https://archwalk.ru/archstyle/neoclassicism
-неорусский_стиль,https://archwalk.ru/archstyle/neo-russian
+неорусский_стиль,https://archwalk.ru/archstyle/neo-russian
 постмодернизм,https://archwalk.ru/archstyle/postmodernism
 ренессанс,https://archwalk.ru/archstyle/renaissance
 романика,https://archwalk.ru/archstyle/romanesque

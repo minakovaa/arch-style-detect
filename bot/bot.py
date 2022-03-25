@@ -29,8 +29,7 @@ dp = Dispatcher(bot)
 # Fill once in func main()
 styles_description = {}
 
-model_loaded, styles = load_checkpoint(checkpoint_path="classifier/checkpoints/resnet50_batch_16_imgsize_600_SGD.pt",
-                                       model_name='resnet50') #efficientnet-b5
+_, styles = load_checkpoint(model_name='resnet18')  # efficientnet-b5
 
 choose_styles_keyboard = types.InlineKeyboardMarkup(resize_keyboard=True,
                                                     one_time_keyboard=True,
@@ -63,16 +62,16 @@ async def send_welcome(message: types.Message):
     await message.reply("Привет!"
                         "\nЭтот бот умеет определять архитектурный стиль здания."
                         "\nДостаточно отправить фотографию." +
-                         f"\n\nРазличает {len(styles)} архитектурный стиль и возвращает"
-                         f" распределение вероятностей по топ-3 наиболее подходящим стилям."
+                        f"\n\nРазличает {len(styles)} архитектурный стиль и возвращает"
+                        f" распределение вероятностей по топ-3 наиболее подходящим стилям."
                         # + ",\n".join([s.replace('_', ' ').capitalize() for s in styles]) + "."
 
-                         "\n\n/styles - список архитектурных стилей"
+                        "\n\n/styles - список архитектурных стилей"
 
-                         "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
+                        "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
 
-                         "\n\n[Приходите на экскурсии и лекции об архитектуре Москвы "
-                         "c Галиной Минаковой](https://archwalk.ru)"
+                        "\n\n[Приходите на экскурсии и лекции об архитектуре Москвы "
+                        "c Галиной Минаковой](https://archwalk.ru)"
                         # "\n\nПро создание бота можно прочитать на сайте "
                         # "Галины Минаковой https://archwalk.ru/about_bot"
                         ,
@@ -135,7 +134,7 @@ def save_image(img, folder_name, img_name):
 
     img.save(os.path.join(path_folder, img_name), 'JPEG')
 
-    logger.debug("Save image %s size %sx%s", img_name, img.size[0], img.size[1])
+    logger.debug("Save image '%s' size %sx%s predicted: '%s'", img_name, img.size[0], img.size[1], folder_name)
 
 
 @dp.message_handler(content_types=['photo'])
@@ -161,13 +160,14 @@ async def detect_style(file_image: types.file):
     top_1_style = sorted_arch_styles[0]
     # Save image after classify to class folder on server
     save_image(img_bytes, folder_name=top_1_style,
-               img_name=file_image['from'].username + '_' +
+               img_name=file_image['from'].username + '_time_' +
                         file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') + '.jpg'
                )
 
     result_str = "\n\nНаиболее вероятные архитектурные стили:\n"
 
     global styles_description
+
     for style in sorted_arch_styles + [CLASS_REMAIN]:
         proba = top_3_styles_with_proba[style]
         if style in styles_description:
@@ -215,11 +215,11 @@ def read_links_with_styles_description_from_file():
 
     styles_description = {'архстиль':'https://...'}
     """
-
     global styles_description
 
-    with open(FILEPATH_WITH_ARCHSTYLES_LINKS, "r") as fin:
+    with open(FILEPATH_WITH_ARCHSTYLES_LINKS, "r", encoding="utf-8") as fin:
         lines = fin.readlines()
+
         for line in lines:
             style_name, weblink = line.strip().split(',')
             styles_description[style_name] = weblink

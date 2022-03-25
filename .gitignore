@@ -4,10 +4,11 @@
 *.warn
 *__pycache__
 bot-venv/
+venv-flask/
 
-dataset*
+*dataset*
 
-classifier/checkpoints/*
+*checkpoints*
 
 train-plots*
 
@@ -17,6 +18,9 @@ bot/*
 !bot/__init__.py
 
 *.ipynb
+*.log
+*.debug
+*.warn
 
 test_one_img.py
 image_transformer.py
