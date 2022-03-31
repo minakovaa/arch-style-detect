@@ -15,7 +15,7 @@ from classifier.classifier_prediction import (
 )
 
 # Maximum size of received image. If greater then image should be downscaled
-MAX_IMG_SIZE = 1024
+MAX_IMG_SIZE = 768  # 1024 # 512
 STATUS_CODE_OK = 200
 
 FILEPATH_WITH_ARCHSTYLES_LINKS = "bot/archstyles_weblinks.txt"
@@ -23,6 +23,7 @@ LOGGER_FILE_CONFIG = "logging.conf.yml"
 
 API_TOKEN = sys.argv[1]  # Bot token
 MODEL_NAME = sys.argv[2]  # Model name (for example 'resnet50')
+is_five_crop_voting = bool(int(sys.argv[3]))  # Is five crop voting when predict image (0 - False, 1 - True)
 # LINK_TO_CLF_API = sys.argv[3]  # Link to classifier api
 
 model_loaded, styles = load_checkpoint(model_name=MODEL_NAME)
@@ -148,7 +149,7 @@ async def detect_style(file_image: types.file):
     #                             headers={'content-type': 'image/jpeg'}) as response:
     #         top_3_styles_with_proba = await response.json()
 
-    top_3_styles_with_proba = predict_image_bytes(model_loaded, styles, img_bytes)  # Request arch styles directly from model
+    top_3_styles_with_proba = predict_image_bytes(model_loaded, styles, img_bytes, is_five_crop_voting)  # Request arch styles directly from model
 
     if top_3_styles_with_proba is None:
         return await file_image.reply("Упс.. 🥲 Неполадки на сервере, попробуйте повторить позже.", reply=False)
