@@ -14,8 +14,6 @@ from classifier.classifier_prediction import (
     predict_image_bytes, load_checkpoint, check_memory, CLASS_REMAIN,
 )
 
-model_loaded, styles = load_checkpoint(model_name='resnet18')
-
 # Maximum size of received image. If greater then image should be downscaled
 MAX_IMG_SIZE = 1024
 STATUS_CODE_OK = 200
@@ -24,7 +22,11 @@ FILEPATH_WITH_ARCHSTYLES_LINKS = "bot/archstyles_weblinks.txt"
 LOGGER_FILE_CONFIG = "logging.conf.yml"
 
 API_TOKEN = sys.argv[1]  # Bot token
-LINK_TO_CLF_API = sys.argv[2]  # Link to classifier api
+MODEL_NAME = sys.argv[2]  # Model name (for example 'resnet50')
+# LINK_TO_CLF_API = sys.argv[3]  # Link to classifier api
+
+model_loaded, styles = load_checkpoint(model_name=MODEL_NAME)
+styles = [style.replace("й", "й") for style in styles]  # fix not showing "й" after saving in torch model
 
 # Initialize bot and dispatcher
 bot = Bot(token=API_TOKEN)

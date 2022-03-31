@@ -36,7 +36,7 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='resnet18'):
             checkpoint_path = "classifier/checkpoints_prod/resnet_18_b_32_img_500_Adam_sched_wd_-07_lr_005.pt"
 
         if model_name == 'resnet50':
-            checkpoint_path = "classifier/checkpoints_prod/resnet50_batch_16_imgsize_600_SGD.pt"
+            checkpoint_path = "classifier/checkpoints_prod/resnet_50_b_64_img_500_Adam_sched_wd_-07_lr_0003.pt"
 
         elif model_name == 'resnet152':
             checkpoint_path = "classifier/checkpoints_prod/model_resnet152_gray_0_5_num_1.pt"
