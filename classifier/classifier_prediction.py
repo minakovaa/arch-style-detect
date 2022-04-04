@@ -36,10 +36,13 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='resnet18'):
         if model_name == 'resnet18':
             checkpoint_path = "classifier/checkpoints_prod/resnet_18_b_32_img_500_Adam_sched_wd_-07_lr_005.pt"
 
+        if model_name == 'resnet34':
+            checkpoint_path = "classifier/checkpoints_prod/full_data_resnet_34_b_64_img_500_Adam_wd_-07_lr_0003-40-epoch.pt"
+
         if model_name == 'resnet50':
             checkpoint_path = "classifier/checkpoints_prod/full_data_resnet_50_b_64_img_500_Adam_wd_-07_lr_0003-30-epoch.pt"
 
-        elif model_name == 'resnet152':
+        if model_name == 'resnet152':
             checkpoint_path = "classifier/checkpoints_prod/model_resnet152_gray_0_5_num_1.pt"
 
         # elif model_name == 'efficientnet-b5':
@@ -57,24 +60,24 @@ def load_checkpoint(checkpoint_path=None, device=None, model_name='resnet18'):
 
     if model_name == 'resnet18':
         model_loaded = models.resnet18(pretrained=False)
-        num_ftrs = model_loaded.fc.in_features
-        model_loaded.fc = nn.Linear(num_ftrs, num_classes)
+
+    if model_name == 'resnet34':
+        model_loaded = models.resnet34(pretrained=False)
 
     if model_name == 'resnet50':
         model_loaded = models.resnet50(pretrained=False)
-        num_ftrs = model_loaded.fc.in_features
-        model_loaded.fc = nn.Linear(num_ftrs, num_classes)
 
-    elif model_name == 'resnet152':
+    if model_name == 'resnet152':
         model_loaded = models.resnet152(pretrained=False)
-        num_ftrs = model_loaded.fc.in_features
-        model_loaded.fc = nn.Linear(num_ftrs, num_classes)
 
     # elif model_name == 'efficientnet-b5':
     #     model_loaded = EfficientNet.from_pretrained('efficientnet-b5', num_classes=num_classes)
     #
     # elif model_name == 'efficientnet-b6':
     #     model_loaded = EfficientNet.from_pretrained('efficientnet-b6', num_classes=num_classes)
+
+    num_ftrs = model_loaded.fc.in_features  # For resnet
+    model_loaded.fc = nn.Linear(num_ftrs, num_classes) # For resnet
 
     model_loaded = model_loaded.to(device)
     model_loaded.load_state_dict(checkpoint['model_state_dict'])
@@ -101,16 +104,17 @@ def classifier_predict(model, input_img, device=None, is_debug=False):
         normalize
     ])
 
-    tensor_img = transform_evaluate(input_img)
-    inputs = tensor_img.to(device)
-    inputs = torch.unsqueeze(inputs, 0)  # make one batch with one image
-    outputs = model(inputs)
-    _, preds = torch.max(outputs, 1)  # top_1 predicted class
+    with torch.no_grad():
+        tensor_img = transform_evaluate(input_img)
+        inputs = tensor_img  # .to(device)
+        inputs = torch.unsqueeze(inputs, 0)  # make one batch with one image
+        outputs = model(inputs)
+        _, preds = torch.max(outputs, 1)  # top_1 predicted class
 
     if is_debug:
         check_memory('classifier_predict_finish')
 
-    return preds, outputs.squeeze().detach().numpy()
+    return preds, outputs.squeeze().numpy()
 
 
 def classifier_predict_voting(model, input_img, device=None, is_debug=False):
@@ -131,10 +135,10 @@ def classifier_predict_voting(model, input_img, device=None, is_debug=False):
 
     NUM_CROPS = 5
 
-    half_width, half_height = input_img.size
-    half_width, half_height = half_width // 2, half_height // 2
+    crop_width, crop_height = input_img.size
+    crop_width, crop_height = crop_width * 3 // 4, crop_height * 3 // 4
 
-    five_crops_transform = transforms.FiveCrop((half_width, half_height))
+    five_crops_transform = transforms.FiveCrop((crop_width, crop_height))
 
     transform_evaluate = transforms.Compose([
         transforms.ToTensor(),
@@ -143,13 +147,16 @@ def classifier_predict_voting(model, input_img, device=None, is_debug=False):
 
     five_crops = five_crops_transform(input_img)  # return 5 crops: top_left,top_right,bottom_left,bottom_right,center
     batch_imgs = torch.stack([transform_evaluate(crop) for crop in five_crops])
+
     inputs = batch_imgs.to(device)
-    outputs = model(inputs)
+    with torch.no_grad():
+        outputs = model(inputs)
+
     _, preds = torch.max(outputs, 1)  # top_1 predicted class
     if device == torch.device("cpu"):
-        preds, outputs = preds.detach().numpy(), outputs.detach().numpy()
+        preds, outputs = preds.numpy(), outputs.numpy()
     else:
-        preds, outputs = preds.cpu().detach().numpy(), outputs.cpu().detach().numpy()
+        preds, outputs = preds.cpu().numpy(), outputs.cpu().numpy()
     # By voting predict class
     vote_preds = Counter(preds)
     win_class = max(vote_preds, key=vote_preds.get)

@@ -4,6 +4,7 @@ import sys
 from io import BytesIO
 import os
 import shutil
+import random
 
 import yaml
 from aiogram import Bot, Dispatcher, executor, types, utils
@@ -15,7 +16,7 @@ from classifier.classifier_prediction import (
 )
 
 # Maximum size of received image. If greater then image should be downscaled
-MAX_IMG_SIZE = 768  # 1024 # 512
+MAX_IMG_SIZE = 1024  # 768  # 1024  # 512
 STATUS_CODE_OK = 200
 
 FILEPATH_WITH_ARCHSTYLES_LINKS = "bot/archstyles_weblinks.txt"
@@ -39,7 +40,6 @@ styles_description = {}
 choose_styles_keyboard = types.InlineKeyboardMarkup(resize_keyboard=True,
                                                     one_time_keyboard=True,
                                                     reply=False)
-
 
 def setup_logging(logging_yaml_config_fpath):
     """setup logging via YAML if it is provided"""
@@ -149,25 +149,38 @@ async def detect_style(file_image: types.file):
     #                             headers={'content-type': 'image/jpeg'}) as response:
     #         top_3_styles_with_proba = await response.json()
 
-    top_3_styles_with_proba = predict_image_bytes(model_loaded, styles, img_bytes, is_five_crop_voting)  # Request arch styles directly from model
+    try:
+        top_3_styles_with_proba = predict_image_bytes(model_loaded, styles, img_bytes, is_five_crop_voting)  # Request arch styles directly from model
+    except Exception as ex:
+        logger.critical(ex, exc_info=True)
+        logger.debug("Error during predicting image bytes")
+        return await file_image.reply("Упс.. 🥲 Неполадки на сервере, попробуйте повторить позже.", reply=False)
 
     if top_3_styles_with_proba is None:
         return await file_image.reply("Упс.. 🥲 Неполадки на сервере, попробуйте повторить позже.", reply=False)
 
-    check_memory("recieve flask request")
+    try:
+        # Delete CLASS_REMAIN='Остальные' before find maximum probability of classes
+        remain_class = {CLASS_REMAIN: top_3_styles_with_proba.pop(CLASS_REMAIN)}
+        sorted_arch_styles = sorted(top_3_styles_with_proba, key=lambda x: int(top_3_styles_with_proba[x]), reverse=True)
+        top_3_styles_with_proba.update(remain_class)
 
-    # Delete CLASS_REMAIN='Остальные' before find maximum probability of classes
-    remain_class = {CLASS_REMAIN: top_3_styles_with_proba.pop(CLASS_REMAIN)}
-    sorted_arch_styles = sorted(top_3_styles_with_proba, key=lambda x: int(top_3_styles_with_proba[x]), reverse=True)
-    top_3_styles_with_proba.update(remain_class)
-
-    top_1_style = sorted_arch_styles[0]
+        top_1_style = sorted_arch_styles[0]
+    except Exception as ex:
+        logger.critical(ex, exc_info=True)
+        logger.debug("Error during filter remain class")
+        return await file_image.reply("Упс.. 🥲 Неполадки на сервере, попробуйте повторить позже.", reply=False)
 
     # Save image after classify to class folder on server
-    save_image(img_bytes, folder_name=top_1_style,
-               img_name=file_image['from'].username + '_time_' +
-                        file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') + '.jpg'
-               )
+    try:
+        username_s = file_image['from'].username if file_image['from'].username else 'noname'
+        time_s = file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') if file_image['date'].strftime('%Y_%m_%d-%H_%M_%S') else 'notime'
+        rnd_num = random.randint(100, 999)
+        img_name = f"{username_s}_time_{time_s}_rnd_{rnd_num}.jpg"
+        save_image(img_bytes, folder_name=top_1_style, img_name=img_name)
+    except Exception as ex:
+        logger.critical(ex, exc_info=True)
+        logger.critical("Error during saving image")
 
     result_str = "\n\nНаиболее вероятные архитектурные стили:\n"
 
@@ -180,6 +193,7 @@ async def detect_style(file_image: types.file):
         else:
             result_str += f"{style.replace('_', ' ').capitalize()} ~ {proba}%\n"
 
+    logger.debug("Received prediction")
     await file_image.reply(f"{utils.markdown.bold(top_1_style.replace('_', ' ').capitalize())}"
                            f"{result_str}"
                            "\n/styles - список архитектурных стилей"
