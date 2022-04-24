@@ -41,6 +41,7 @@ choose_styles_keyboard = types.InlineKeyboardMarkup(resize_keyboard=True,
                                                     one_time_keyboard=True,
                                                     reply=False)
 
+
 def setup_logging(logging_yaml_config_fpath):
     """setup logging via YAML if it is provided"""
     global logger
@@ -69,6 +70,8 @@ async def send_welcome(message: types.Message):
                         "\n\n/styles - список архитектурных стилей"
 
                         "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
+                        
+                        "\n\n[Подписывайтесь на канал](https://t.me/archwalk)"
 
                         "\n\n[Приходите на экскурсии и лекции об архитектуре Москвы "
                         "c Галиной Минаковой](https://archwalk.ru)"
@@ -137,7 +140,16 @@ def save_image(img, folder_name, img_name):
     logger.debug("Save image '%s' size %sx%s predicted: '%s'", img_name, img.size[0], img.size[1], folder_name)
 
 
-@dp.message_handler(content_types=['photo'])
+@dp.message_handler(content_types=types.message.ContentType.DOCUMENT)
+async def catch_file(file_image: types.file):
+    if file_image.document.mime_type.startswith("image"):
+        file_image['photo'] = [file_image.document.thumb]
+        await detect_style(file_image)
+    else:
+        return await file_image.reply("Упс.. 🥲 Я могу принимать только фотографии. Попробуйте еще раз", reply=True)
+
+
+@dp.message_handler(content_types=['photo'])  # types.message.ContentType.PHOTO
 async def detect_style(file_image: types.file):
     # Get image bytes from user
     img_bytes = await download_image(file_image)
@@ -197,7 +209,8 @@ async def detect_style(file_image: types.file):
     await file_image.reply(f"{utils.markdown.bold(top_1_style.replace('_', ' ').capitalize())}"
                            f"{result_str}"
                            "\n/styles - список архитектурных стилей"
-                           "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)",
+                           "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
+                           "\n\n[Подписывайтесь на канал](https://t.me/archwalk)",
                            parse_mode=types.ParseMode.MARKDOWN,
                            disable_web_page_preview=True,
                            reply=True)
