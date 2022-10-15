@@ -111,6 +111,10 @@ def classifier_predict(model, input_img, device=None, is_debug=False):
         outputs = model(inputs)
         _, preds = torch.max(outputs, 1)  # top_1 predicted class
 
+    del inputs
+    del tensor_img
+    del input_img
+
     if is_debug:
         check_memory('classifier_predict_finish')
 
