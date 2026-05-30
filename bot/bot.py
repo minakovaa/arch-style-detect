@@ -69,14 +69,14 @@ async def send_welcome(message: types.Message):
 
                         "\n\n/styles - список архитектурных стилей"
 
-                        "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
+                        "\n\n[Поддержать автора 🤗](https://minakova.moscow/donate)"
                         
                         "\n\n[Подписывайтесь на канал](https://t.me/archwalk)"
 
                         "\n\n[Приходите на экскурсии и лекции об архитектуре Москвы "
-                        "c Галиной Минаковой](https://archwalk.ru)"
+                        "c Галиной Минаковой](https://minakova.moscow)"
                         # "\n\nПро создание бота можно прочитать на сайте "
-                        # "Галины Минаковой https://archwalk.ru/about_bot"
+                        # "Галины Минаковой https://minakova.moscow/about_bot"
                         ,
                         parse_mode=types.ParseMode.MARKDOWN,
                         disable_web_page_preview=True,
@@ -209,7 +209,7 @@ async def detect_style(file_image: types.file):
     await file_image.reply(f"{utils.markdown.bold(top_1_style.replace('_', ' ').capitalize())}"
                            f"{result_str}"
                            "\n/styles - список архитектурных стилей"
-                           "\n\n[Поддержать автора 🤗](https://archwalk.ru/donate)"
+                           "\n\n[Поддержать автора 🤗](https://minakova.moscow/donate)"
                            "\n\n[Подписывайтесь на канал](https://t.me/archwalk)",
                            parse_mode=types.ParseMode.MARKDOWN,
                            disable_web_page_preview=True,
